@@ -1,0 +1,47 @@
+streamlit_app.py
+import streamlit as st
+import pandas as pd
+
+st.set_page_config(page_title="Talk Time Dashboard", layout="wide")
+
+st.title("📞 Call Talk Time Dashboard")
+
+uploaded_file = st.file_uploader("Upload Call Log CSV", type=["csv"])
+
+if uploaded_file:
+    df = pd.read_csv(uploaded_file)
+
+    df["Call Time"] = pd.to_datetime(df["Call Time"])
+    df["Hour"] = df["Call Time"].dt.strftime("%I:00 %p")
+
+    total_calls = len(df)
+    connected_calls = df[df["Status"] == "Connected"].shape[0]
+    not_connected_calls = total_calls - connected_calls
+    total_talk_time = round(df["Talk Time (sec)"].sum() / 60, 2)
+
+    hourly = (
+        df.groupby("Hour")
+        .agg(
+            Talk_Time_Min=("Talk Time (sec)", lambda x: round(x.sum()/60, 2)),
+            Dials=("Talk Time (sec)", "count")
+        )
+        .reset_index()
+    )
+
+    hourly["Talk Time So Far (min)"] = hourly["Talk_Time_Min"].cumsum()
+    hourly["Dials So Far"] = hourly["Dials"].cumsum()
+
+    peak_hour = hourly.loc[hourly["Talk_Time_Min"].idxmax(), "Hour"]
+
+    st.subheader("📊 Summary")
+    col1, col2, col3, col4 = st.columns(4)
+
+    col1.metric("Total Calls", total_calls)
+    col2.metric("Connected Calls", connected_calls)
+    col3.metric("Not Connected Calls", not_connected_calls)
+    col4.metric("Total Talk Time (min)", total_talk_time)
+
+    st.write(f"🕒 **Peak Hour:** {peak_hour}")
+
+    st.subheader("⏰ Hour-wise Call Table")
+    st.dataframe(hourly)
